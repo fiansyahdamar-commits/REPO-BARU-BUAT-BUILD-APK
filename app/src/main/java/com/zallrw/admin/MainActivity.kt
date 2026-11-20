@@ -1,11 +1,12 @@
 package com.zallrw.admin
 
 import android.app.Activity
-import android.os.Bundle
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
+import android.os.Bundle
+import android.view.View
 import android.view.ViewGroup
 import android.widget.*
 import org.json.JSONObject
@@ -19,15 +20,18 @@ class MainActivity : Activity() {
     private val prefs by lazy { getSharedPreferences("zallrw_admin", Context.MODE_PRIVATE) }
     private var adminToken = ""
     private lateinit var status: TextView
-    private lateinit var output: TextView
-    private lateinit var root: LinearLayout
+    private lateinit var resultBox: LinearLayout
+    private lateinit var codeResult: TextView
+    private lateinit var passwordResult: TextView
+    private lateinit var maxUses: EditText
+    private lateinit var mode: Spinner
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         adminToken = prefs.getString("session_token", "") ?: ""
         showLogin()
         if (adminToken.isNotBlank()) {
-            request("GET", "/me", null, true) { _, err ->
+            request("GET", "/me", null) { _, err ->
                 if (err == null) showPanel() else {
                     clearSession()
                     showLogin()
@@ -66,7 +70,6 @@ class MainActivity : Activity() {
         }
 
     private fun install(page: LinearLayout) {
-        root = page
         setContentView(ScrollView(this).apply {
             addView(page, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         })
@@ -79,8 +82,8 @@ class MainActivity : Activity() {
     private fun showLogin() {
         val page = column()
         page.addView(label("ZALL RW", 16f, Color.RED))
-        page.addView(label("ADMIN PANEL", 29f))
-        page.addView(label("Masukkan password panel admin."))
+        page.addView(label("ADMIN", 30f))
+        page.addView(label("Masukkan password admin."))
         val password = field("Password admin")
         password.inputType = 129
         page.addView(password)
@@ -91,17 +94,16 @@ class MainActivity : Activity() {
                 return@button
             }
             val body = JSONObject().put("password", value).put("deviceLabel", android.os.Build.MODEL)
-            request("POST", "/login", body, false) { response, err ->
+            request("POST", "/login", body) { response, err ->
                 if (err != null) {
                     setStatus("Login gagal: $err")
                 } else {
                     try {
-                        val token = JSONObject(response ?: "{}").getString("token")
-                        adminToken = token
-                        prefs.edit().putString("session_token", token).apply()
+                        adminToken = JSONObject(response ?: "{}").getString("token")
+                        prefs.edit().putString("session_token", adminToken).apply()
                         showPanel()
                     } catch (_: Exception) {
-                        setStatus("Login gagal: respons server tidak valid")
+                        setStatus("Respons login tidak valid")
                     }
                 }
             }
@@ -114,33 +116,42 @@ class MainActivity : Activity() {
     private fun showPanel() {
         val page = column()
         page.addView(label("ZALL RW ADMIN", 27f, Color.RED))
-        page.addView(label("Backend Admin terpisah • sesi tersimpan 30 hari"))
-        page.addView(button("DASHBOARD / STATISTIK") { load("/stats") })
-        page.addView(button("DAFTAR REDEEM CODE") { load("/codes") })
-        page.addView(button("RIWAYAT AKTIVASI") { load("/activations") })
+        page.addView(label("BUAT KODE REDEEM", 19f, Color.WHITE))
 
-        page.addView(label("BUAT REDEEM CODE", 21f, Color.RED))
-        val mode = Spinner(this)
-        mode.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, listOf("SINGLE - 1 pengguna/perangkat", "MULTI - banyak pengguna"))
+        mode = Spinner(this)
+        mode.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_dropdown_item,
+            listOf("SINGLE • 1 perangkat", "MULTI • banyak perangkat")
+        )
+        page.addView(label("Jenis kode"))
         page.addView(mode)
-        val maxUses = field("Batas penggunaan untuk MULTI", true)
+
+        page.addView(label("Batas perangkat / pengguna"))
+        maxUses = field("Contoh: 10", true)
         maxUses.setText("10")
         page.addView(maxUses)
-        val duration = Spinner(this)
-        duration.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, listOf("7 hari", "30 hari", "90 hari", "Permanen"))
-        page.addView(duration)
-        val redeemPassword = field("Password redeem (minimal 6 karakter)")
-        redeemPassword.inputType = 129
-        page.addView(redeemPassword)
-        page.addView(button("BUAT KODE") {
-            val isSingle = mode.selectedItemPosition == 0
-            val uses = if (isSingle) 1 else (maxUses.text.toString().toIntOrNull() ?: 0)
-            if (uses < 1) {
-                maxUses.error = "Batas penggunaan minimal 1"
-                return@button
+        mode.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                maxUses.visibility = if (position == 0) View.GONE else View.VISIBLE
             }
-            if (redeemPassword.text.length < 6) {
-                redeemPassword.error = "Password minimal 6 karakter"
+        }
+
+        page.addView(label("Masa aktif"))
+        val duration = Spinner(this)
+        duration.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_dropdown_item,
+            listOf("7 hari", "30 hari", "90 hari", "Permanen")
+        )
+        page.addView(duration)
+
+        page.addView(button("BUAT KODE OTOMATIS") {
+            val single = mode.selectedItemPosition == 0
+            val uses = if (single) 1 else (maxUses.text.toString().toIntOrNull() ?: 0)
+            if (uses < 1) {
+                maxUses.error = "Masukkan batas minimal 1"
                 return@button
             }
             val days: Any = when (duration.selectedItemPosition) {
@@ -150,41 +161,84 @@ class MainActivity : Activity() {
                 else -> JSONObject.NULL
             }
             val payload = JSONObject()
-                .put("mode", if (isSingle) "SINGLE" else "MULTI")
+                .put("mode", if (single) "SINGLE" else "MULTI")
                 .put("max_uses", uses)
                 .put("duration_days", days)
-                .put("password", redeemPassword.text.toString())
-            request("POST", "/codes", payload) { body, err -> showResult(body, err) }
-        })
-
-        page.addView(label("AKTIFKAN / NONAKTIFKAN KODE", 19f, Color.RED))
-        val codeId = field("ID redeem code")
-        page.addView(codeId)
-        val active = Spinner(this)
-        active.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, listOf("Aktifkan", "Nonaktifkan"))
-        page.addView(active)
-        page.addView(button("SIMPAN STATUS KODE") {
-            val id = codeId.text.toString().trim()
-            if (id.isBlank()) {
-                codeId.error = "ID kode wajib diisi"
-                return@button
-            }
-            val payload = JSONObject().put("is_active", active.selectedItemPosition == 0)
-            request("PATCH", "/codes/$id", payload) { body, err -> showResult(body, err) }
-        })
-
-        page.addView(button("MUAT ULANG DASHBOARD") { load("/stats") })
-        page.addView(button("KUNCI PANEL / LOGOUT") {
-            request("POST", "/logout", JSONObject(), true) { _, _ ->
-                clearSession()
-                showLogin()
+            setStatus("Sedang membuat kode...")
+            request("POST", "/codes", payload) { body, err ->
+                if (err != null) {
+                    setStatus("Gagal membuat kode: $err")
+                } else {
+                    try {
+                        val data = JSONObject(body ?: "{}")
+                        codeResult.text = data.optString("code", "-")
+                        passwordResult.text = data.optString("redeem_password", "-")
+                        resultBox.visibility = View.VISIBLE
+                        setStatus("Kode berhasil dibuat. Simpan keduanya.")
+                    } catch (_: Exception) {
+                        setStatus("Respons pembuatan kode tidak valid")
+                    }
+                }
             }
         })
+
+        resultBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, 18, 0, 18)
+            visibility = View.GONE
+        }
+        resultBox.addView(label("KODE REDEEM", 14f, Color.LTGRAY))
+        codeResult = label("-", 19f, Color.WHITE)
+        resultBox.addView(codeResult)
+        resultBox.addView(button("SALIN KODE") { copy(codeResult.text.toString()) })
+        resultBox.addView(label("PASSWORD REDEEM", 14f, Color.LTGRAY))
+        passwordResult = label("-", 19f, Color.WHITE)
+        resultBox.addView(passwordResult)
+        resultBox.addView(button("SALIN PASSWORD") { copy(passwordResult.text.toString()) })
+        page.addView(resultBox)
+
+        page.addView(button("DAFTAR KODE") { loadCodes() })
         status = label("")
-        output = label("Hasil server akan tampil di sini", 13f, Color.LTGRAY)
         page.addView(status)
-        page.addView(output)
         install(page)
+    }
+
+    private fun copy(value: String) {
+        if (value.isBlank() || value == "-") return
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("Zall RW", value))
+        setStatus("Berhasil disalin")
+    }
+
+    private fun loadCodes() {
+        request("GET", "/codes", null) { body, err ->
+            if (err != null) {
+                setStatus("Gagal memuat kode: $err")
+                return@request
+            }
+            try {
+                val array = JSONObject(body ?: "{}").optJSONArray("codes")
+                val lines = mutableListOf<String>()
+                if (array != null) {
+                    for (i in 0 until array.length()) {
+                        val item = array.getJSONObject(i)
+                        lines.add(
+                            "${item.optString("code_hint")} • ${item.optString("mode")} • " +
+                            "${if (item.optBoolean("is_active")) "AKTIF" else "NONAKTIF"}"
+                        )
+                    }
+                }
+                val message = if (lines.isEmpty()) "Belum ada kode." else lines.joinToString("\n")
+                AlertDialog.Builder(this)
+                    .setTitle("Daftar Kode")
+                    .setMessage(message)
+                    .setPositiveButton("Tutup", null)
+                    .show()
+                setStatus("Daftar kode diperbarui")
+            } catch (_: Exception) {
+                setStatus("Data daftar kode tidak valid")
+            }
+        }
     }
 
     private fun clearSession() {
@@ -192,22 +246,10 @@ class MainActivity : Activity() {
         prefs.edit().remove("session_token").apply()
     }
 
-    private fun load(path: String) {
-        request("GET", path, null) { body, err -> showResult(body, err) }
-    }
-
-    private fun showResult(body: String?, err: String?) {
-        runOnUiThread {
-            setStatus(if (err == null) "Berhasil" else "Gagal: $err")
-            if (::output.isInitialized) output.text = body ?: ""
-        }
-    }
-
     private fun request(
         method: String,
         path: String,
         payload: JSONObject?,
-        allowEmptyToken: Boolean = false,
         done: (String?, String?) -> Unit
     ) {
         runOnUiThread { setStatus("Memproses...") }
@@ -218,11 +260,7 @@ class MainActivity : Activity() {
                     connectTimeout = 20000
                     readTimeout = 20000
                     setRequestProperty("Accept", "application/json")
-                    if (adminToken.isNotBlank() && !allowEmptyToken) {
-                        setRequestProperty("Authorization", "Bearer $adminToken")
-                    } else if (adminToken.isNotBlank() && (path == "/me" || path == "/logout")) {
-                        setRequestProperty("Authorization", "Bearer $adminToken")
-                    }
+                    if (adminToken.isNotBlank()) setRequestProperty("Authorization", "Bearer $adminToken")
                     if (payload != null) {
                         doOutput = true
                         setRequestProperty("Content-Type", "application/json")
