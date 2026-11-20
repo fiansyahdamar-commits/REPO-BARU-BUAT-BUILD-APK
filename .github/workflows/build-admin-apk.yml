@@ -20,7 +20,42 @@ jobs:
           gradle-version: '8.9'
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
-      - uses: actions/upload-artifact@v4
+
+      - name: Smoke-test APK startup in Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          script: |
+            set -e
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb shell am force-stop com.zallrw.admin
+            adb shell am start -n com.zallrw.admin/.MainActivity
+            sleep 25
+            PID="$(adb shell pidof com.zallrw.admin | tr -d '\r')"
+            adb logcat -d -t 600 > startup-logcat.txt || true
+            if [ -n "$PID" ]; then
+              echo "PASS: com.zallrw.admin survived 25 seconds after launch (pid=$PID)" > startup-result.txt
+            else
+              echo "FAIL: com.zallrw.admin process was not alive 25 seconds after launch" > startup-result.txt
+              exit 1
+            fi
+
+      - name: Upload startup diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZallRW-ADMIN-STARTUP-DIAGNOSTICS
+          path: |
+            startup-result.txt
+            startup-logcat.txt
+          if-no-files-found: warn
+
+      - name: Upload Admin APK
+        if: success()
+        uses: actions/upload-artifact@v4
         with:
           name: ZallRW-ADMIN-APK
           path: app/build/outputs/apk/debug/app-debug.apk
