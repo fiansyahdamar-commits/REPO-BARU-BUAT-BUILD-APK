@@ -16,7 +16,7 @@ import java.net.URL
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
-    private val api = "https://rhdzwbrskonsinprsepr.supabase.co/functions/v1/admin-api"
+    private val api = "https://nvxgpmbakbzjyfjstdwl.supabase.co/functions/v1/admin-api-v2"
     private val executor = Executors.newSingleThreadExecutor()
     private val prefs by lazy { getSharedPreferences("zallrw_admin", Context.MODE_PRIVATE) }
     private var adminToken = ""
@@ -266,7 +266,7 @@ class MainActivity : Activity() {
                     for (i in 0 until rows.length()) {
                         val item = rows.getJSONObject(i)
                         lines.add(
-                            "${item.optString("activated_at")} • Kode #${item.optString("code_id")}\n" +
+                            "${item.optString("redeemed_at")} • Kode #${item.optString("code_id")}\n" +
                             "Perangkat: ${item.optString("device_id")}\n" +
                             "Berlaku sampai: ${item.optString("expires_at", "Permanen")}"
                         )
