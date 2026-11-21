@@ -26,12 +26,12 @@ jobs:
         env:
           ANDROID_I_WANT_MY_TCG: 'yes'
         with:
-          api-level: 30
+          api-level: 35
           arch: x86_64
           target: google_apis
           profile: pixel_2
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none
-          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -wipe-data -no-snapshot -memory 2048 -cores 2 -camera-back none
+          disable-animations: true
           script: bash scripts/smoke-test-admin.sh
 
       - name: Upload startup diagnostics
