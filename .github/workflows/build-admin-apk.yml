@@ -31,7 +31,7 @@ jobs:
           target: google_apis
           profile: pixel_2
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
+          disable-animations: false
           script: |
             set -e
             adb install -r app/build/outputs/apk/debug/app-debug.apk
