@@ -199,6 +199,17 @@ class MainActivity : Activity() {
         page.addView(resultBox)
 
         page.addView(button("DAFTAR KODE") { loadCodes() })
+        page.addView(button("RIWAYAT AKTIVASI") { loadActivations() })
+        page.addView(button("KUNCI PANEL") {
+            request("POST", "/lock", JSONObject()) { _, err ->
+                if (err != null) {
+                    setStatus("Gagal mengunci panel: $err")
+                } else {
+                    clearSession()
+                    showLogin()
+                }
+            }
+        })
         status = label("")
         page.addView(status)
         install(page)
@@ -238,6 +249,37 @@ class MainActivity : Activity() {
                 setStatus("Daftar kode diperbarui")
             } catch (_: Exception) {
                 setStatus("Data daftar kode tidak valid")
+            }
+        }
+    }
+
+    private fun loadActivations() {
+        request("GET", "/activations", null) { body, err ->
+            if (err != null) {
+                setStatus("Gagal memuat riwayat: $err")
+                return@request
+            }
+            try {
+                val rows = JSONObject(body ?: "{}").optJSONArray("activations")
+                val lines = mutableListOf<String>()
+                if (rows != null) {
+                    for (i in 0 until rows.length()) {
+                        val item = rows.getJSONObject(i)
+                        lines.add(
+                            "${item.optString("activated_at")} • Kode #${item.optString("code_id")}\n" +
+                            "Perangkat: ${item.optString("device_id")}\n" +
+                            "Berlaku sampai: ${item.optString("expires_at", "Permanen")}"
+                        )
+                    }
+                }
+                AlertDialog.Builder(this)
+                    .setTitle("Riwayat Aktivasi")
+                    .setMessage(if (lines.isEmpty()) "Belum ada aktivasi." else lines.joinToString("\n\n"))
+                    .setPositiveButton("Tutup", null)
+                    .show()
+                setStatus("Riwayat aktivasi diperbarui")
+            } catch (_: Exception) {
+                setStatus("Data riwayat tidak valid")
             }
         }
     }
