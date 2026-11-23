@@ -8,6 +8,7 @@ import android.content.Context
 import android.graphics.Color
 import android.os.Bundle
 import android.view.View
+import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.*
 import org.json.JSONObject
@@ -144,7 +145,7 @@ class MainActivity : Activity() {
         duration.adapter = ArrayAdapter(
             this,
             android.R.layout.simple_spinner_dropdown_item,
-            listOf("7 hari", "30 hari", "90 hari", "Permanen")
+            listOf("7 hari", "30 hari", "90 hari", "365 hari", "Permanen")
         )
         page.addView(duration)
 
@@ -159,6 +160,7 @@ class MainActivity : Activity() {
                 0 -> 7
                 1 -> 30
                 2 -> 90
+                3 -> 365
                 else -> JSONObject.NULL
             }
             val payload = JSONObject()
@@ -230,22 +232,101 @@ class MainActivity : Activity() {
             }
             try {
                 val array = JSONObject(body ?: "{}").optJSONArray("codes")
-                val lines = mutableListOf<String>()
-                if (array != null) {
+                val list = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(4, 4, 4, 4)
+                }
+                val scroll = ScrollView(this).apply {
+                    addView(list, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                }
+
+                if (array == null || array.length() == 0) {
+                    list.addView(label("Belum ada kode redeem.", 15f, Color.LTGRAY))
+                } else {
                     for (i in 0 until array.length()) {
                         val item = array.getJSONObject(i)
-                        lines.add(
-                            "${item.optString("code_hint")} • ${item.optString("mode")} • " +
-                            "${if (item.optBoolean("is_active")) "AKTIF" else "NONAKTIF"}"
-                        )
+                        val id = item.optLong("id")
+                        val hint = item.optString("code_hint", "------")
+                        val codeMode = item.optString("mode", "SINGLE")
+                        val max = item.optInt("max_uses", 1)
+                        val durationDays = if (item.isNull("duration_days")) {
+                            "Permanen"
+                        } else {
+                            "${item.optInt("duration_days")} hari"
+                        }
+                        val expires = item.optString("expires_at", "")
+                        val revoked = item.optString("status") == "revoked"
+                        val active = item.optBoolean("is_active") && !revoked
+                        val state = when {
+                            revoked -> "DICABUT"
+                            active -> "AKTIF"
+                            else -> "NONAKTIF"
+                        }
+                        val details = TextView(this).apply {
+                            text = "••••$hint  •  $codeMode  •  $state\nBatas: $max perangkat  •  Durasi: $durationDays" +
+                                if (expires.isBlank()) "" else "\nBatas tanggal: $expires"
+                            textSize = 13f
+                            setTextColor(Color.WHITE)
+                            setPadding(0, 10, 10, 10)
+                            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                        }
+                        val action = Button(this).apply {
+                            text = if (active) "NONAKTIFKAN" else "AKTIFKAN"
+                            isEnabled = !revoked
+                            textSize = 10f
+                            setPadding(8, 6, 8, 6)
+                        }
+                        val row = LinearLayout(this).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            gravity = Gravity.CENTER_VERTICAL
+                            setPadding(4, 6, 4, 6)
+                            addView(details)
+                            addView(action, LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                                ViewGroup.LayoutParams.WRAP_CONTENT
+                            ))
+                        }
+                        list.addView(row)
+                        if (i < array.length() - 1) {
+                            val divider = View(this).apply {
+                                setBackgroundColor(Color.DKGRAY)
+                            }
+                            list.addView(divider, LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT, 1
+                            ))
+                        }
+                        action.setOnClickListener {
+                            val enable = !active
+                            AlertDialog.Builder(this)
+                                .setTitle(if (enable) "Aktifkan kode?" else "Nonaktifkan kode?")
+                                .setMessage("Kode ••••$hint akan ${if (enable) "diaktifkan" else "dinonaktifkan"}.")
+                                .setNegativeButton("Batal", null)
+                                .setPositiveButton("Ya") { _, _ ->
+                                    request(
+                                        "PATCH",
+                                        "/codes/$id",
+                                        JSONObject().put("is_active", enable)
+                                    ) { _, updateError ->
+                                        if (updateError != null) {
+                                            setStatus("Gagal mengubah status: $updateError")
+                                        } else {
+                                            setStatus(if (enable) "Kode berhasil diaktifkan." else "Kode berhasil dinonaktifkan.")
+                                            listDialog.dismiss()
+                                            loadCodes()
+                                        }
+                                    }
+                                }
+                                .show()
+                        }
                     }
                 }
-                val message = if (lines.isEmpty()) "Belum ada kode." else lines.joinToString("\n")
-                AlertDialog.Builder(this)
-                    .setTitle("Daftar Kode")
-                    .setMessage(message)
+
+                val listDialog = AlertDialog.Builder(this)
+                    .setTitle("Daftar Kode Redeem")
+                    .setView(scroll)
                     .setPositiveButton("Tutup", null)
-                    .show()
+                    .create()
+                listDialog.show()
                 setStatus("Daftar kode diperbarui")
             } catch (_: Exception) {
                 setStatus("Data daftar kode tidak valid")
@@ -316,6 +397,15 @@ class MainActivity : Activity() {
                 val stream = if (code in 200..299) conn.inputStream else conn.errorStream
                 val body = stream?.bufferedReader()?.use { it.readText() } ?: ""
                 conn.disconnect()
+                if (code == 401 && adminToken.isNotBlank() && path != "/login") {
+                    runOnUiThread {
+                        clearSession()
+                        showLogin()
+                        setStatus("Sesi admin berakhir. Silakan masuk kembali.")
+                        done(null, "Sesi admin berakhir. Silakan masuk kembali.")
+                    }
+                    return@execute
+                }
                 if (code !in 200..299) {
                     val message = try { JSONObject(body).optString("error", body) } catch (_: Exception) { body }
                     throw IllegalStateException("HTTP $code: $message")
