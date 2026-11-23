@@ -145,7 +145,7 @@ class MainActivity : Activity() {
         duration.adapter = ArrayAdapter(
             this,
             android.R.layout.simple_spinner_dropdown_item,
-            listOf("7 hari", "30 hari", "90 hari", "365 hari", "Permanen")
+            listOf("1 hari", "2 hari", "3 hari", "7 hari", "30 hari", "90 hari", "365 hari", "Permanen")
         )
         page.addView(duration)
 
@@ -157,10 +157,13 @@ class MainActivity : Activity() {
                 return@button
             }
             val days: Any = when (duration.selectedItemPosition) {
-                0 -> 7
-                1 -> 30
-                2 -> 90
-                3 -> 365
+                0 -> 1
+                1 -> 2
+                2 -> 3
+                3 -> 7
+                4 -> 30
+                5 -> 90
+                6 -> 365
                 else -> JSONObject.NULL
             }
             val payload = JSONObject()
