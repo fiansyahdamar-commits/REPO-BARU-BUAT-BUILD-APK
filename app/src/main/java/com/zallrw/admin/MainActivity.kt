@@ -239,6 +239,7 @@ class MainActivity : Activity() {
                 val scroll = ScrollView(this).apply {
                     addView(list, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                 }
+                var listDialog: AlertDialog? = null
 
                 if (array == null || array.length() == 0) {
                     list.addView(label("Belum ada kode redeem.", 15f, Color.LTGRAY))
@@ -311,7 +312,7 @@ class MainActivity : Activity() {
                                             setStatus("Gagal mengubah status: $updateError")
                                         } else {
                                             setStatus(if (enable) "Kode berhasil diaktifkan." else "Kode berhasil dinonaktifkan.")
-                                            listDialog.dismiss()
+                                            listDialog?.dismiss()
                                             loadCodes()
                                         }
                                     }
@@ -321,12 +322,12 @@ class MainActivity : Activity() {
                     }
                 }
 
-                val listDialog = AlertDialog.Builder(this)
+                listDialog = AlertDialog.Builder(this)
                     .setTitle("Daftar Kode Redeem")
                     .setView(scroll)
                     .setPositiveButton("Tutup", null)
                     .create()
-                listDialog.show()
+                listDialog?.show()
                 setStatus("Daftar kode diperbarui")
             } catch (_: Exception) {
                 setStatus("Data daftar kode tidak valid")
