@@ -84,7 +84,7 @@ class MainActivity : Activity() {
     private fun showLogin() {
         val page = column()
         page.addView(label("ZALL RW", 16f, Color.RED))
-        page.addView(label("ADMIN", 30f))
+        page.addView(label("ADMIN • V2", 30f))
         page.addView(label("Masukkan password admin."))
         val password = field("Password admin")
         password.inputType = 129
