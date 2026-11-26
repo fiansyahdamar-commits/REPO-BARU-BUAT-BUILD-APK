@@ -2,6 +2,9 @@ package com.zallrw.admin
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.KeyguardManager
+import android.content.Intent
+import android.provider.Settings
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -17,6 +20,7 @@ import java.net.URL
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
+    private val deviceLockRequest = 2301
     private val api = "https://vpcavoumahovwzeypxqa.supabase.co/functions/v1/admin-api"
     private val executor = Executors.newSingleThreadExecutor()
     private val prefs by lazy { getSharedPreferences("zallrw_admin", Context.MODE_PRIVATE) }
@@ -50,7 +54,7 @@ class MainActivity : Activity() {
                     showSetup()
                 } else if (adminToken.isNotBlank()) {
                     request("GET", "/me", null) { _, sessionError ->
-                        if (sessionError == null) showPanel() else {
+                        if (sessionError == null) unlockWithDeviceCredential() else {
                             clearSession()
                             showLogin()
                             setStatus("Sesi perlu login ulang.")
@@ -167,7 +171,7 @@ class MainActivity : Activity() {
                     try {
                         adminToken = JSONObject(response ?: "{}").getString("token")
                         prefs.edit().putString("session_token", adminToken).apply()
-                        showPanel()
+                        unlockWithDeviceCredential()
                     } catch (_: Exception) {
                         setStatus("Respons login tidak valid")
                     }
@@ -176,6 +180,62 @@ class MainActivity : Activity() {
         })
         status = label("")
         page.addView(status)
+        install(page)
+    }
+
+
+    private fun unlockWithDeviceCredential() {
+        if (android.os.Build.VERSION.SDK_INT < 23) {
+            showPanel()
+            return
+        }
+        val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        if (!keyguard.isDeviceSecure) {
+            AlertDialog.Builder(this)
+                .setTitle("Kunci layar diperlukan")
+                .setMessage("Aktifkan PIN, pola, atau sandi layar perangkat agar panel admin tetap terlindungi.")
+                .setCancelable(false)
+                .setPositiveButton("BUKA PENGATURAN") { _, _ ->
+                    startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
+                }
+                .setNegativeButton("KELUAR") { _, _ ->
+                    clearSession()
+                    showLogin()
+                }
+                .show()
+            return
+        }
+        val intent = keyguard.createConfirmDeviceCredentialIntent("Buka Zall RW Admin", "Verifikasi PIN, pola, atau sandi perangkat")
+        if (intent == null) {
+            showPanel()
+        } else {
+            startActivityForResult(intent, deviceLockRequest)
+        }
+    }
+
+    @Deprecated("Deprecated in Android API; retained for compatibility with minSdk 23")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == deviceLockRequest) {
+            if (resultCode == Activity.RESULT_OK) {
+                showPanel()
+            } else {
+                showDeviceLocked()
+            }
+        }
+    }
+
+    private fun showDeviceLocked() {
+        val page = column()
+        page.addView(label("ZALL RW ADMIN", 25f, Color.RED))
+        page.addView(label("Panel terkunci. Verifikasi kunci layar untuk melanjutkan."))
+        page.addView(button("BUKA PANEL") { unlockWithDeviceCredential() })
+        page.addView(button("KELUAR DARI AKUN") {
+            request("POST", "/lock", JSONObject()) { _, _ ->
+                clearSession()
+                showLogin()
+            }
+        })
         install(page)
     }
 
