@@ -1,4 +1,4 @@
-package com.zallrw.admin
+package com.zallrw.admin.v3
 
 import android.app.Activity
 import android.app.AlertDialog
@@ -152,7 +152,7 @@ class MainActivity : Activity() {
     private fun showLogin() {
         val page = column()
         page.addView(label("ZALL RW", 16f, Color.RED))
-        page.addView(label("ADMIN • V3", 30f))
+        page.addView(label("ADMIN • V3.0", 30f))
         page.addView(label("Masukkan password admin."))
         val password = field("Password admin")
         password.inputType = 129
