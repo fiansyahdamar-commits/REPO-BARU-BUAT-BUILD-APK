@@ -17,7 +17,7 @@ import java.net.URL
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
-    private val api = "https://nvxgpmbakbzjyfjstdwl.supabase.co/functions/v1/admin-api-v2"
+    private val api = "https://rhdzwbrskonsinprsepr.supabase.co/functions/v1/admin-api"
     private val executor = Executors.newSingleThreadExecutor()
     private val prefs by lazy { getSharedPreferences("zallrw_admin", Context.MODE_PRIVATE) }
     private var adminToken = ""
