@@ -56,15 +56,15 @@ if [[ "$INSTALLED" -ne 1 ]]; then
   exit 1
 fi
 
-adb shell am force-stop com.zallrw.admin
-adb shell am start -n com.zallrw.admin/.MainActivity
+adb shell am force-stop com.zallrw.admin.v3
+adb shell am start -n com.zallrw.admin.v3/.MainActivity
 sleep 25
-PID="$(adb shell pidof com.zallrw.admin | tr -d '\r' || true)"
+PID="$(adb shell pidof com.zallrw.admin.v3 | tr -d '\r' || true)"
 adb logcat -d -t 600 > startup-logcat.txt 2>&1 || true
 
 if [[ -n "$PID" ]]; then
-  echo "PASS: com.zallrw.admin survived 25 seconds after launch (pid=$PID)" > startup-result.txt
+  echo "PASS: com.zallrw.admin.v3 survived 25 seconds after launch (pid=$PID)" > startup-result.txt
 else
-  echo "FAIL: com.zallrw.admin process was not alive 25 seconds after launch" > startup-result.txt
+  echo "FAIL: com.zallrw.admin.v3 process was not alive 25 seconds after launch" > startup-result.txt
   exit 1
 fi
