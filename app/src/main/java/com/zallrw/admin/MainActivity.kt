@@ -35,8 +35,7 @@ class MainActivity : Activity() {
         if (adminToken.isNotBlank()) {
             request("GET", "/me", null) { _, err ->
                 if (err == null) showPanel() else {
-                    clearSession()
-                    showLogin()
+                    setStatus("Sesi belum dapat diperiksa: $err. Periksa jaringan lalu buka kembali.")
                 }
             }
         }
