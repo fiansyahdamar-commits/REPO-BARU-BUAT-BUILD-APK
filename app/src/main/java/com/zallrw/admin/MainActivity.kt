@@ -17,7 +17,7 @@ import java.net.URL
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
-    private val api = "https://rhdzwbrskonsinprsepr.supabase.co/functions/v1/admin-api"
+    private val api = "https://vpcavoumahovwzeypxqa.supabase.co/functions/v1/admin-api"
     private val executor = Executors.newSingleThreadExecutor()
     private val prefs by lazy { getSharedPreferences("zallrw_admin", Context.MODE_PRIVATE) }
     private var adminToken = ""
@@ -31,11 +31,33 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         adminToken = prefs.getString("session_token", "") ?: ""
-        showLogin()
-        if (adminToken.isNotBlank()) {
-            request("GET", "/me", null) { _, err ->
-                if (err == null) showPanel() else {
-                    setStatus("Sesi belum dapat diperiksa: $err. Periksa jaringan lalu buka kembali.")
+        setContentView(LinearLayout(this).apply {
+            setBackgroundColor(Color.rgb(10, 10, 10))
+            gravity = Gravity.CENTER
+            addView(TextView(this@MainActivity).apply {
+                text = "ZALL RW ADMIN V3"
+                setTextColor(Color.RED)
+                textSize = 22f
+            })
+        })
+        request("GET", "/status", null) { response, err ->
+            if (err != null) {
+                showLogin()
+                setStatus("Tidak dapat memeriksa status setup: $err")
+            } else {
+                val setupRequired = try { JSONObject(response ?: "{}").optBoolean("setup_required", true) } catch (_: Exception) { true }
+                if (setupRequired) {
+                    showSetup()
+                } else if (adminToken.isNotBlank()) {
+                    request("GET", "/me", null) { _, sessionError ->
+                        if (sessionError == null) showPanel() else {
+                            clearSession()
+                            showLogin()
+                            setStatus("Sesi perlu login ulang.")
+                        }
+                    }
+                } else {
+                    showLogin()
                 }
             }
         }
@@ -80,10 +102,53 @@ class MainActivity : Activity() {
         if (::status.isInitialized) status.text = message
     }
 
+
+    private fun showSetup() {
+        val page = column()
+        page.addView(label("ZALL RW", 16f, Color.RED))
+        page.addView(label("SETUP ADMIN V3", 28f))
+        page.addView(label("Setup satu kali. Masukkan token setup, lalu buat password admin baru minimal 12 karakter."))
+        val setupToken = field("Token setup")
+        page.addView(setupToken)
+        val password = field("Password admin baru")
+        password.inputType = 129
+        page.addView(password)
+        val confirm = field("Ulangi password admin")
+        confirm.inputType = 129
+        page.addView(confirm)
+        page.addView(button("AKTIFKAN PANEL ADMIN") {
+            val tokenValue = setupToken.text.toString().trim()
+            val passValue = password.text.toString()
+            if (tokenValue.isBlank()) {
+                setupToken.error = "Token setup wajib diisi"
+                return@button
+            }
+            if (passValue.length < 12) {
+                password.error = "Minimal 12 karakter"
+                return@button
+            }
+            if (passValue != confirm.text.toString()) {
+                confirm.error = "Password tidak sama"
+                return@button
+            }
+            request("POST", "/setup", JSONObject().put("setup_token", tokenValue).put("password", passValue)) { _, err ->
+                if (err != null) {
+                    setStatus("Setup gagal: $err")
+                } else {
+                    showLogin()
+                    setStatus("Setup berhasil. Silakan login dengan password baru.")
+                }
+            }
+        })
+        status = label("")
+        page.addView(status)
+        install(page)
+    }
+
     private fun showLogin() {
         val page = column()
         page.addView(label("ZALL RW", 16f, Color.RED))
-        page.addView(label("ADMIN • V2", 30f))
+        page.addView(label("ADMIN • V3", 30f))
         page.addView(label("Masukkan password admin."))
         val password = field("Password admin")
         password.inputType = 129
@@ -248,7 +313,7 @@ class MainActivity : Activity() {
                 } else {
                     for (i in 0 until array.length()) {
                         val item = array.getJSONObject(i)
-                        val id = item.optLong("id")
+                        val id = item.optString("id")
                         val hint = item.optString("code_hint", "------")
                         val codeMode = item.optString("mode", "SINGLE")
                         val max = item.optInt("max_uses", 1)
