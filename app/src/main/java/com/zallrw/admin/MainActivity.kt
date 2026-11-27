@@ -28,7 +28,6 @@ class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var resultBox: LinearLayout
     private lateinit var codeResult: TextView
-    private lateinit var passwordResult: TextView
     private lateinit var maxUses: EditText
     private lateinit var mode: Spinner
 
@@ -302,9 +301,8 @@ class MainActivity : Activity() {
                     try {
                         val data = JSONObject(body ?: "{}")
                         codeResult.text = data.optString("code", "-")
-                        passwordResult.text = data.optString("password", "-")
                         resultBox.visibility = View.VISIBLE
-                        setStatus("Kode dan password berhasil dibuat. Berikan keduanya kepada pengguna.")
+                        setStatus("Kode redeem berhasil dibuat. Berikan kode kepada pengguna.")
                     } catch (_: Exception) {
                         setStatus("Respons pembuatan kode tidak valid")
                     }
@@ -321,10 +319,6 @@ class MainActivity : Activity() {
         codeResult = label("-", 19f, Color.WHITE)
         resultBox.addView(codeResult)
         resultBox.addView(button("SALIN KODE") { copy(codeResult.text.toString()) })
-        resultBox.addView(label("PASSWORD REDEEM", 14f, Color.LTGRAY))
-        passwordResult = label("-", 19f, Color.WHITE)
-        resultBox.addView(passwordResult)
-        resultBox.addView(button("SALIN PASSWORD") { copy(passwordResult.text.toString()) })
         page.addView(resultBox)
 
         page.addView(button("DAFTAR KODE") { loadCodes() })
