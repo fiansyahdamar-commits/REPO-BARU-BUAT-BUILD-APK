@@ -5,7 +5,7 @@ plugins {
 android {
     namespace = "com.zallrw.admin.v3"
     compileSdk = 35
-    defaultConfig { applicationId = "com.zallrw.admin.v3"; minSdk = 23; targetSdk = 35; versionCode = 4; versionName = "3.0.1" }
+    defaultConfig { applicationId = "com.zallrw.admin.v3"; minSdk = 23; targetSdk = 35; versionCode = 5; versionName = "3.0.2" }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
 }
